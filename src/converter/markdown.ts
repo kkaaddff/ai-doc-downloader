@@ -81,7 +81,22 @@ export class MarkdownConverter {
   }
 
   private postProcessMarkdown(markdown: string): string {
+    // Define patterns to skip
+    const patternsToSkip = [
+      ':root',
+      'try {',
+      '{"props":'
+    ];
+
+    // Split content into lines, filter unwanted lines, and rejoin
     return markdown
+      .split('\n')
+      .filter(line => {
+        const trimmedLine = line.trim();
+        // Keep empty lines and lines that don't start with skip patterns
+        return !trimmedLine || !patternsToSkip.some(pattern => trimmedLine.startsWith(pattern));
+      })
+      .join('\n')
       // Remove multiple consecutive blank lines
       .replace(/\n{3,}/g, '\n\n')
       // Remove trailing whitespace
