@@ -1,0 +1,187 @@
+
+我需要实现一个 Docs 下载器。  
+输入是一个 url，输出是一份 Markdown 格式的文档列表。  
+由于有些网站是 SPA 的，所以实现时要用 playwright 去打开浏览器去访问。  
+要遍历这个网站的所有地址，如果是当前网站下的，添加到队列里，也要去获取。  
+基于 TypeScript，Node，Playwright。
+
+请帮我设计一个方案。  
+分步骤。  
+每一步包含要做的任务描述。
+
+---
+
+我将为您设计一个分步骤实现方案：
+
+1. 项目初始化阶段
+- 创建Node.js项目并安装依赖
+  ✔️ 初始化npm/yarn项目
+  ✔️ 安装核心依赖：playwright, turndown（HTML转Markdown）
+  ✔️ 安装开发依赖：@types/node, typescript
+- 配置TypeScript编译环境
+  ✔️ 添加tsconfig.json配置
+  ✔️ 设置输出目录为dist/
+
+2. 核心模块设计阶段
+- 爬虫引擎模块设计
+  ✔️ 实现浏览器实例管理
+  ✔️ 设计URL队列系统（使用广度优先算法）
+  ✔️ 添加已访问URL的记录和过滤
+- HTML处理器模块
+  ✔️ 实现HTML内容清洗
+  ✔️ 添加Turndown配置（自定义转换规则）
+  ✔️ 内容规范化处理（标题层级调整等）
+- 输出模块设计
+  ✔️ 设计Markdown文件存储结构
+  ✔️ 实现文件名生成策略（基于URL路径）
+  ✔️ 添加元数据保存（原始URL、抓取时间等）
+
+3. 核心功能实现阶段
+- 实现浏览器自动化控制
+  ✔️ 初始化Playwright浏览器实例
+  ✔️ 配置页面加载策略（等待网络空闲）
+  ✔️ 处理SPA动态路由
+- 实现URL收集系统
+  ✔️ 解析页面中的<a>标签
+  ✔️ 过滤同源URL
+  ✔️ 处理相对路径和绝对路径
+  ✔️ 排除非文档链接（图片、脚本等）
+- 实现内容转换管道
+  ✔️ HTML正文内容提取
+  ✔️ 使用Turndown转换核心内容
+  ✔️ 保留代码块的格式
+  ✔️ 处理表格等复杂结构
+
+4. 优化增强阶段
+- 性能优化
+  ✔️ 实现并发控制（同时打开多个页面）
+  ✔️ 设置请求超时机制
+  ✔️ 实现失败重试策略
+- 稳定性增强
+  ✔️ 处理弹窗和拦截广告
+  ✔️ 添加页面滚动加载（针对懒加载）
+  ✔️ 配置请求拦截（阻止非必要资源）
+- 配置化设计
+  ✔� 添加最大深度限制
+  ✔️ 设置可排除路径模式
+  ✔️ 配置请求间隔时间
+  ✔️ 设置最大抓取数量
+
+5. 输出处理阶段
+- 实现文件存储系统
+  ✔️ 创建层次化目录结构
+  ✔️ 处理特殊字符文件名
+  ✔️ 添加自动重命名策略
+- 生成目录索引
+  ✔️ 自动生成SUMMARY.md
+  ✔️ 维护文档间的链接关系
+  ✔️ 保留原始网站结构
+
+6. 测试验证阶段
+- 编写测试用例
+  ✔️ 单页应用测试（React/Vue）
+  ✔️ 传统网站测试
+  ✔️ 复杂结构文档测试
+  ✔️ 权限验证测试
+- 实现验证机制
+  ✔️ 完整性检查
+  ✔️ 格式验证
+  ✔️ 链接有效性验证
+
+技术实现要点：
+1. 使用Playwright的Chromium实例处理SPA：
+```typescript
+import { chromium } from 'playwright';
+
+const browser = await chromium.launch({ headless: true });
+const context = await browser.newContext();
+```
+
+2. URL规范化处理示例：
+```typescript
+function normalizeUrl(base: string, href: string): string | null {
+  try {
+    const url = new URL(href, base);
+    return url.origin === new URL(base).origin ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+3. 内容转换核心逻辑：
+```typescript
+import TurndownService from 'turndown';
+
+const turndownService = new TurndownService({
+  codeBlockStyle: 'fenced',
+  headingStyle: 'atx'
+});
+
+turndownService.addRule('pre', {
+  filter: 'pre',
+  replacement: (content) => `\n\`\`\`\n${content}\n\`\`\`\n`
+});
+```
+
+4. 队列管理实现示例：
+```typescript
+class CrawlerQueue {
+  private visited = new Set<string>();
+  private queue: string[] = [];
+
+  add(url: string) {
+    if (!this.visited.has(url)) {
+      this.queue.push(url);
+      this.visited.add(url);
+    }
+  }
+
+  next(): string | undefined {
+    return this.queue.shift();
+  }
+}
+```
+
+5. 主流程伪代码：
+```typescript
+async function crawl(startUrl: string) {
+  const queue = new CrawlerQueue();
+  queue.add(startUrl);
+
+  while (true) {
+    const url = queue.next();
+    if (!url) break;
+
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: 'networkidle' });
+    
+    // 提取内容
+    const content = await page.content();
+    const markdown = turndownService.turndown(content);
+    
+    // 提取链接
+    const links = await page.$$eval('a', as => as.map(a => a.href));
+    links.forEach(link => {
+      const normalized = normalizeUrl(url, link);
+      if (normalized) queue.add(normalized);
+    });
+
+    // 保存文件
+    saveToFile(url, markdown);
+    
+    await page.close();
+  }
+
+  await browser.close();
+}
+```
+
+建议的优化方向：
+1. 添加智能等待策略：通过检测DOM变化稳定状态
+2. 实现增量抓取：记录ETag或Last-Modified时间
+3. 添加API文档识别：自动检测Swagger等文档系统
+4. 支持身份验证：处理需要登录的场景
+5. 实现分布式爬虫：支持多节点协作抓取
+
+这个方案需要根据具体网站的复杂度进行调整，特别是针对不同SPA框架可能需要不同的等待策略。对于大型网站，建议添加速率限制和礼貌爬取策略。

@@ -1,0 +1,233 @@
+Step 1: Project Setup
+- Initialize a new Node.js project:
+  npm init -y
+- Install core dependencies:
+  npm install playwright turndown
+- Install dev dependencies:
+  npm install -D typescript @types/node @types/turndown
+- Create TypeScript configuration:
+  npx tsc --init
+
+Step 2: Project Structure
+Create the following directory structure:
+```
+.
+├── src/
+│   ├── crawler/
+│   │   ├── browser.ts
+│   │   ├── queue.ts
+│   │   └── urlUtils.ts
+│   ├── converter/
+│   │   └── markdown.ts
+│   ├── storage/
+│   │   └── fileSystem.ts
+│   └── index.ts
+├── dist/
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+Step 3: Core Classes Implementation
+1. Create browser.ts:
+```typescript
+import { chromium, Browser, Page } from 'playwright';
+
+export class BrowserManager {
+  private browser: Browser | null = null;
+
+  async init() {
+    this.browser = await chromium.launch({ headless: true });
+  }
+
+  async newPage(): Promise<Page> {
+    if (!this.browser) throw new Error('Browser not initialized');
+    const context = await this.browser.newContext();
+    return context.newPage();
+  }
+
+  async close() {
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = null;
+    }
+  }
+}
+```
+
+2. Create queue.ts:
+```typescript
+export class CrawlerQueue {
+  private visited = new Set<string>();
+  private queue: string[] = [];
+
+  add(url: string) {
+    if (!this.visited.has(url)) {
+      this.queue.push(url);
+      this.visited.add(url);
+    }
+  }
+
+  next(): string | undefined {
+    return this.queue.shift();
+  }
+
+  isEmpty(): boolean {
+    return this.queue.length === 0;
+  }
+}
+```
+
+3. Create urlUtils.ts:
+```typescript
+export function normalizeUrl(base: string, href: string): string | null {
+  try {
+    const url = new URL(href, base);
+    return url.origin === new URL(base).origin ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+Step 4: Markdown Converter Implementation
+Create markdown.ts:
+```typescript
+import TurndownService from 'turndown';
+
+export class MarkdownConverter {
+  private turndown: TurndownService;
+
+  constructor() {
+    this.turndown = new TurndownService({
+      codeBlockStyle: 'fenced',
+      headingStyle: 'atx'
+    });
+
+    this.turndown.addRule('pre', {
+      filter: 'pre',
+      replacement: (content) => `\n\`\`\`\n${content}\n\`\`\`\n`
+    });
+  }
+
+  convert(html: string): string {
+    return this.turndown.turndown(html);
+  }
+}
+```
+
+Step 5: Storage Implementation
+Create fileSystem.ts:
+```typescript
+import { writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
+
+export class FileStorage {
+  constructor(private baseDir: string) {}
+
+  async saveMarkdown(url: URL, content: string) {
+    const fileName = this.urlToFilePath(url);
+    const filePath = join(this.baseDir, fileName);
+    
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, content, 'utf-8');
+  }
+
+  private urlToFilePath(url: URL): string {
+    const path = url.pathname === '/' ? '/index' : url.pathname;
+    return path.replace(/\/$/, '/index').replace(/\/$/, '') + '.md';
+  }
+}
+```
+
+Step 6: Main Application Implementation
+Create index.ts:
+```typescript
+import { BrowserManager } from './crawler/browser';
+import { CrawlerQueue } from './crawler/queue';
+import { normalizeUrl } from './crawler/urlUtils';
+import { MarkdownConverter } from './converter/markdown';
+import { FileStorage } from './storage/fileSystem';
+
+async function main(startUrl: string, outputDir: string) {
+  const browser = new BrowserManager();
+  const queue = new CrawlerQueue();
+  const converter = new MarkdownConverter();
+  const storage = new FileStorage(outputDir);
+
+  await browser.init();
+  queue.add(startUrl);
+
+  try {
+    while (!queue.isEmpty()) {
+      const url = queue.next();
+      if (!url) break;
+
+      console.log(`Processing: ${url}`);
+      const page = await browser.newPage();
+      
+      try {
+        await page.goto(url, { waitUntil: 'networkidle' });
+        
+        // Extract content
+        const content = await page.content();
+        const markdown = converter.convert(content);
+        
+        // Save content
+        await storage.saveMarkdown(new URL(url), markdown);
+        
+        // Extract links
+        const links = await page.$$eval('a', as => as.map(a => a.href));
+        for (const link of links) {
+          const normalized = normalizeUrl(url, link);
+          if (normalized) queue.add(normalized);
+        }
+      } catch (error) {
+        console.error(`Error processing ${url}:`, error);
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+// Usage example
+if (require.main === module) {
+  const url = process.argv[2];
+  const outputDir = process.argv[3] || './output';
+  
+  if (!url) {
+    console.error('Please provide a URL to crawl');
+    process.exit(1);
+  }
+
+  main(url, outputDir).catch(console.error);
+}
+```
+
+Step 7: Build and Run
+1. Compile TypeScript:
+   npx tsc
+
+2. Run the application:
+   node dist/index.js "https://example.com" "./output"
+
+Step 8: Testing and Validation
+1. Test with different types of websites:
+   - Static websites
+   - Single Page Applications (React/Vue)
+   - Documentation websites
+
+2. Verify output:
+   - Check markdown formatting
+   - Validate links between documents
+   - Ensure all pages are captured
+
+Step 9: Optimization (Optional)
+- Implement concurrent processing
+- Add rate limiting
+- Handle authentication if needed
+- Add progress reporting
+- Implement retry mechanism for failed requests 
