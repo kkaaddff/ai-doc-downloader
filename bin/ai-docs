@@ -1,0 +1,9 @@
+#!/usr/bin/env node
+const { main } = require('../dist/index')
+const url = process.argv[2]
+const outputDir = process.argv[3] || './output'
+if (!url) {
+  console.error('Please provide a URL to crawl')
+  process.exit(1)
+}
+main(url, outputDir).catch(console.error)
