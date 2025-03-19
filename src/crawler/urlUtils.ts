@@ -1,18 +1,18 @@
 export function normalizeUrl(base: string, href: string): string | null {
   try {
-    const url = new URL(href, base);
-    const baseUrl = new URL(base);
-    
+    const url = new URL(href, base)
+    const baseUrl = new URL(base)
+
     // Check if the URL is from the same origin
     if (url.origin !== baseUrl.origin) {
-      return null;
+      return null
     }
 
     // Remove the fragment
-    url.hash = '';
+    url.hash = ''
 
-    return url.href;
+    return url.href
   } catch {
-    return null;
+    return null
   }
-} 
+}

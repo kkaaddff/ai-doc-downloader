@@ -45,4 +45,4 @@ node dist/index.js "https://example.com" "./output"
 
 - playwright: Web automation
 - turndown: HTML to Markdown conversion
-- TypeScript: Development 
+- TypeScript: Development
