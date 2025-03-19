@@ -2,8 +2,9 @@
 const { main } = require('../dist/index')
 const url = process.argv[2]
 const outputDir = process.argv[3] || './output'
+const cookieFile = process.argv[4]
 if (!url) {
   console.error('Please provide a URL to crawl')
   process.exit(1)
 }
-main(url, outputDir).catch(console.error)
+main(url, outputDir, cookieFile).catch(console.error)
