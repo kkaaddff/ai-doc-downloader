@@ -6,7 +6,12 @@ import { CrawlerQueue } from './crawler/queue'
 import { normalizeUrl } from './crawler/urlUtils'
 import { FileStorage } from './storage/fileSystem'
 
-export async function main(startUrl: string, outputDir: string, cookieFile?: string) {
+export async function main(
+  startUrl: string,
+  outputDir: string,
+  cookieFile?: string,
+  recursive: boolean = false
+) {
   const browser = new BrowserManager()
   const queue = new CrawlerQueue()
   const converter = new MarkdownConverter()
@@ -52,11 +57,13 @@ export async function main(startUrl: string, outputDir: string, cookieFile?: str
           console.log(`Skipping content extraction for: ${url} (file already exists)`)
         }
 
-        // Extract links
-        const links = await page.$$eval('a', (as) => as.map((a) => a.href))
-        for (const link of links) {
-          const normalized = normalizeUrl(url, link)
-          if (normalized) queue.add(normalized)
+        // 只在启用递归模式时收集链接
+        if (recursive) {
+          const links = await page.$$eval('a', (as) => as.map((a) => a.href))
+          for (const link of links) {
+            const normalized = normalizeUrl(url, link)
+            if (normalized) queue.add(normalized)
+          }
         }
       } catch (error) {
         console.error(`Error processing ${url}:`, error)

@@ -1,10 +1,23 @@
 #!/usr/bin/env node
+const cac = require('cac')
 const { main } = require('../dist/index')
-const url = process.argv[2]
-const outputDir = process.argv[3] || './output'
-const cookieFile = process.argv[4]
-if (!url) {
-  console.error('Please provide a URL to crawl')
-  process.exit(1)
-}
-main(url, outputDir, cookieFile).catch(console.error)
+
+const cli = cac('ai-docs')
+
+cli
+  .command('<url>', '要爬取的网页 URL')
+  .option('-o, --output <dir>', '输出目录', { default: './output' })
+  .option('-c, --cookie <file>', 'Cookie 文件路径')
+  .option('-r, --recursive', '递归爬取链接')
+  .action(async (url, options) => {
+    try {
+      await main(url, options.output, options.cookie, options.recursive)
+    } catch (error) {
+      console.error(error)
+      process.exit(1)
+    }
+  })
+
+cli.help()
+cli.version('1.0.0')
+cli.parse()
